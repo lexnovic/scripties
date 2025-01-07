@@ -1,15 +1,48 @@
 import base64
 import json
+import hmac
+import hashlib
 
 def base64url_decode(data: str) -> bytes:
-    """
-    Decodes a Base64 URL–encoded string into raw bytes.
-    Handles missing padding by adding '=' if necessary.
-    """
+    """Decodes Base64 URL–encoded data."""
     padding_needed = 4 - (len(data) % 4)
     if padding_needed and padding_needed < 4:
         data += '=' * padding_needed
     return base64.urlsafe_b64decode(data)
+
+def base64url_encode(data: bytes) -> str:
+    """Encodes data to Base64 URL format."""
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+
+def verify_signature(header_b64, payload_b64, signature_b64, secret, algorithm):
+    """
+    Verifies the JWT signature using the given secret and algorithm.
+    """
+    signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
+    signature_bytes = base64url_decode(signature_b64)
+
+    if algorithm == "HS256":
+        expected_signature = hmac.new(
+            secret.encode('utf-8'),
+            signing_input,
+            hashlib.sha256
+        ).digest()
+    elif algorithm == "HS384":
+        expected_signature = hmac.new(
+            secret.encode('utf-8'),
+            signing_input,
+            hashlib.sha384
+        ).digest()
+    elif algorithm == "HS512":
+        expected_signature = hmac.new(
+            secret.encode('utf-8'),
+            signing_input,
+            hashlib.sha512
+        ).digest()
+    else:
+        return False, f"Unsupported algorithm: {algorithm}"
+
+    return hmac.compare_digest(signature_bytes, expected_signature), None
 
 def main():
     # Prompt user for a JWT token
@@ -46,21 +79,31 @@ def main():
         print("Error decoding signature:", e)
         return
 
-    # Print the results
+    # Print the decoded results
     print("\nDecoded Header (JSON):")
     print(json.dumps(header_json, indent=4))
 
     print("\nDecoded Payload (JSON):")
     print(json.dumps(payload_json, indent=4))
 
-    # Signature is typically binary data; we'll show it in hex for readability
+    # Signature as hex
     print("\nSignature (raw bytes in hex):")
     print(signature_bytes.hex())
 
-    # Highlight the algorithm from the header if present
+    # Highlight algorithm and verify signature
     alg = header_json.get("alg", None)
     if alg:
         print(f"\nAlgorithm used for signature: {alg}")
+        secret = input("Enter the secret phrase to verify the signature: ")
+
+        is_valid, error = verify_signature(header_b64, payload_b64, signature_b64, secret, alg)
+        if error:
+            print(f"Verification error: {error}")
+        else:
+            if is_valid:
+                print("Signature verification: ✅ VALID")
+            else:
+                print("Signature verification: ❌ INVALID")
     else:
         print("\nNo 'alg' field was found in the header.")
 
