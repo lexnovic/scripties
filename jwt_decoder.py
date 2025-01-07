@@ -4,45 +4,52 @@ import hmac
 import hashlib
 
 def base64url_decode(data: str) -> bytes:
-    """Decodes Base64 URL–encoded data."""
+    """
+    Decodes a Base64 URL–encoded string into raw bytes.
+    Handles missing padding by adding '=' if necessary.
+    """
     padding_needed = 4 - (len(data) % 4)
     if padding_needed and padding_needed < 4:
         data += '=' * padding_needed
     return base64.urlsafe_b64decode(data)
 
 def base64url_encode(data: bytes) -> str:
-    """Encodes data to Base64 URL format."""
+    """
+    Encodes raw bytes into Base64 URL format (no padding).
+    """
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
 
-def verify_signature(header_b64, payload_b64, signature_b64, secret, algorithm):
+def verify_signature(header_b64: str, payload_b64: str, signature_b64: str, secret: str, alg: str) -> bool:
     """
-    Verifies the JWT signature using the given secret and algorithm.
+    Verifies the signature of the JWT using the provided secret.
     """
-    signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
-    signature_bytes = base64url_decode(signature_b64)
+    signing_input = f"{header_b64}.{payload_b64}"
 
-    if algorithm == "HS256":
+    if alg == "HS256":
         expected_signature = hmac.new(
             secret.encode('utf-8'),
-            signing_input,
+            signing_input.encode('utf-8'),
             hashlib.sha256
         ).digest()
-    elif algorithm == "HS384":
+    elif alg == "HS384":
         expected_signature = hmac.new(
             secret.encode('utf-8'),
-            signing_input,
+            signing_input.encode('utf-8'),
             hashlib.sha384
         ).digest()
-    elif algorithm == "HS512":
+    elif alg == "HS512":
         expected_signature = hmac.new(
             secret.encode('utf-8'),
-            signing_input,
+            signing_input.encode('utf-8'),
             hashlib.sha512
         ).digest()
     else:
-        return False, f"Unsupported algorithm: {algorithm}"
+        print(f"Unsupported algorithm: {alg}")
+        return False
 
-    return hmac.compare_digest(signature_bytes, expected_signature), None
+    # Compare the provided signature with the expected one
+    expected_signature_b64 = base64url_encode(expected_signature)
+    return expected_signature_b64 == signature_b64
 
 def main():
     # Prompt user for a JWT token
@@ -79,33 +86,34 @@ def main():
         print("Error decoding signature:", e)
         return
 
-    # Print the decoded results
+    # Print the decoded header and payload
     print("\nDecoded Header (JSON):")
     print(json.dumps(header_json, indent=4))
 
     print("\nDecoded Payload (JSON):")
     print(json.dumps(payload_json, indent=4))
 
-    # Signature as hex
+    # Signature in hex
     print("\nSignature (raw bytes in hex):")
     print(signature_bytes.hex())
 
-    # Highlight algorithm and verify signature
+    # Highlight algorithm
     alg = header_json.get("alg", None)
     if alg:
         print(f"\nAlgorithm used for signature: {alg}")
-        secret = input("Enter the secret phrase to verify the signature: ")
-
-        is_valid, error = verify_signature(header_b64, payload_b64, signature_b64, secret, alg)
-        if error:
-            print(f"Verification error: {error}")
-        else:
-            if is_valid:
-                print("Signature verification: ✅ VALID")
-            else:
-                print("Signature verification: ❌ INVALID")
     else:
         print("\nNo 'alg' field was found in the header.")
+        return
+
+    # Prompt for the secret key
+    secret = input("\nEnter the secret key to verify the token: ").strip()
+
+    # Verify the token
+    is_valid = verify_signature(header_b64, payload_b64, signature_b64, secret, alg)
+    if is_valid:
+        print("\n✅ The JWT signature is valid.")
+    else:
+        print("\n❌ The JWT signature is invalid. The token may have been tampered with or the secret is incorrect.")
 
 if __name__ == "__main__":
     main()
