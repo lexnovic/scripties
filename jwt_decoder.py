@@ -3,7 +3,7 @@ import json
 import hmac
 import hashlib
 
-def base64url_decode(data: str) -> bytes:
+def base64url_decode(data):
     """
     Decodes a Base64 URL–encoded string into raw bytes.
     Handles missing padding by adding '=' if necessary.
@@ -13,13 +13,13 @@ def base64url_decode(data: str) -> bytes:
         data += '=' * padding_needed
     return base64.urlsafe_b64decode(data)
 
-def base64url_encode(data: bytes) -> str:
+def base64url_encode(data):
     """
     Encodes raw bytes into Base64 URL format (no padding).
     """
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
 
-def verify_signature(header_b64: str, payload_b64: str, signature_b64: str, secret: str, alg: str) -> bool:
+def verify_signature(header_b64, payload_b64, signature_b64, secret, alg):
     """
     Verifies the signature of the JWT using the provided secret.
     """
